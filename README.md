@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 ## DMS – Donations Management System
 A monorepo for a temple’s donation platform:
 - Web (React/Vite/TS) – donor self-service (e.g., Donate page)
