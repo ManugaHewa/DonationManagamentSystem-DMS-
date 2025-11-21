@@ -1,0 +1,393 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  VOLUNTEER
+  DONOR
+  BOARD_MEMBER
+}
+
+enum DonationType {
+  CASH
+  CHEQUE
+  CREDIT_CARD
+  DEBIT_CARD
+  INTERAC
+  EFT
+  CANADA_HELPS
+  IN_KIND
+  OTHER
+}
+
+enum DonationStatus {
+  PENDING_VALIDATION
+  VALIDATED
+  RECEIPT_GENERATED
+  CANCELLED
+}
+
+enum ReceiptType {
+  ACKNOWLEDGMENT
+  TAX_RECEIPT
+  YEAR_END_SUMMARY
+}
+
+enum ReceiptFormat {
+  EMAIL
+  PDF
+  PRINT
+}
+
+enum Currency {
+  CAD
+  USD
+}
+
+enum FamilyMemberRelation {
+  SPOUSE
+  PARENT
+  CHILD
+  SIBLING
+  GRANDPARENT
+  GRANDCHILD
+  OTHER
+}
+
+enum RememberedPersonType {
+  FAMILY_MEMBER
+  FRIEND
+  OTHER
+}
+
+// ==================== USERS & AUTH ====================
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password          String
+  role              UserRole  @default(DONOR)
+  isActive          Boolean   @default(true)
+  emailVerified     Boolean   @default(false)
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  
+  // Relations
+  donor             Donor?
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([email])
+
+  validatedDonations  Donation[]      @relation("ValidatedDonations")
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([email])
+  @@index([token])
+}
+
+// ==================== DONORS & FAMILIES ====================
+
+model Donor {
+  id                String    @id @default(cuid())
+  
+  // Required fields
+  firstName         String
+  lastName          String
+  email             String    @unique
+  mobile            String
+  address           String
+  city              String
+  province          String
+  postalCode        String
+  country           String    @default("Canada")
+  
+  // Optional fields
+  secondaryEmail    String?
+  landline          String?
+  dateOfBirth       DateTime?
+  
+  // System fields
+  isAnonymous       Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  preferredLanguage String    @default("en") // en, si, ta
+  
+  // Receipt preferences
+  receiptPreference ReceiptFormat @default(EMAIL)
+  consolidateFamily Boolean   @default(false)
+  
+  // Relations
+  userId            String?   @unique
+  user              User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  familyId          String?
+  family            Family?   @relation(fields: [familyId], references: [id])
+  
+  donations         Donation[]
+  receipts          Receipt[]
+  familyMembers     FamilyMember[]
+  alokaPujas        AlokaPuja[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([email])
+  @@index([familyId])
+  @@index([lastName, firstName])
+}
+
+model Family {
+  id              String         @id @default(cuid())
+  familyName      String
+  headOfFamily    String?
+  
+  // Relations
+  donors          Donor[]
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  @@index([familyName])
+}
+
+model FamilyMember {
+  id              String                @id @default(cuid())
+  donorId         String
+  donor           Donor                 @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  
+  firstName       String
+  lastName        String
+  relation        FamilyMemberRelation
+  dateOfBirth     DateTime?
+  isDeceased      Boolean               @default(false)
+  deceasedDate    DateTime?
+  
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  
+  @@index([donorId])
+}
+
+// ==================== DONATIONS ====================
+
+model DonationCause {
+  id              String     @id @default(cuid())
+  name            String     @unique
+  description     String?
+  isActive        Boolean    @default(true)
+  isTaxDeductible Boolean    @default(true)
+  
+  // Relations
+  donations       Donation[]
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  @@index([name])
+}
+
+model Donation {
+  id                  String          @id @default(cuid())
+  
+  // Core details
+  donorId             String?
+  donor               Donor?          @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  
+  causeId             String
+  cause               DonationCause   @relation(fields: [causeId], references: [id])
+  
+  type                DonationType
+  status              DonationStatus  @default(PENDING_VALIDATION)
+  
+  // Financial details
+  amount              Decimal         @db.Decimal(10, 2)
+  currency            Currency        @default(CAD)
+  processorFees       Decimal?        @db.Decimal(10, 2)
+  netAmount           Decimal         @db.Decimal(10, 2)
+  
+  // Dates
+  dateRecorded        DateTime        @default(now())
+  dateVerified        DateTime?
+  
+  // Remarks
+  donorRemarks        String?
+  templeRemarks       String?
+  
+  // Metadata
+  isAnonymous         Boolean         @default(false)
+  isTaxDeductible     Boolean         @default(true)
+  
+  // Relations
+  receipts            Receipt[]
+  
+  // Validation
+  validatedById       String?
+  validatedBy         User?           @relation("ValidatedDonations", fields: [validatedById], references: [id], onDelete: SetNull)
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  
+  @@index([donorId])
+  @@index([causeId])
+  @@index([status])
+  @@index([dateRecorded])
+}
+
+// ==================== RECEIPTS ====================
+
+model Receipt {
+  id              String        @id @default(cuid())
+  receiptNumber   String        @unique
+  
+  donorId         String
+  donor           Donor         @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  
+  donationId      String?
+  donation        Donation?     @relation(fields: [donationId], references: [id], onDelete: SetNull)
+  
+  type            ReceiptType
+  format          ReceiptFormat
+  
+  // Tax receipt details
+  fiscalYear      Int?
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  taxDeductible   Decimal       @db.Decimal(10, 2)
+  
+  // Distribution
+  emailSent       Boolean       @default(false)
+  emailSentAt     DateTime?
+  printGenerated  Boolean       @default(false)
+  
+  // Storage
+  fileUrl         String?
+  fileName        String?
+  
+  issuedAt        DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  
+  @@index([donorId])
+  @@index([receiptNumber])
+  @@index([fiscalYear])
+}
+
+// ==================== ALOKA PUJA & REMEMBRANCE ====================
+
+model AlokaPuja {
+  id                  String              @id @default(cuid())
+  
+  donorId             String
+  donor               Donor               @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  
+  pujaDate            DateTime
+  pujaType            String              // e.g., "Birthday", "Remembrance", "Anniversary"
+  
+  // Relations
+  rememberedPersons   RememberedPerson[]
+  
+  // Notifications
+  notifyStaff         Boolean             @default(true)
+  notificationSent    Boolean             @default(false)
+  notificationSentAt  DateTime?
+  
+  notes               String?
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  @@index([donorId])
+  @@index([pujaDate])
+}
+
+model RememberedPerson {
+  id              String              @id @default(cuid())
+  
+  alokaPujaId     String
+  alokaPuja       AlokaPuja           @relation(fields: [alokaPujaId], references: [id], onDelete: Cascade)
+  
+  firstName       String
+  lastName        String
+  personType      RememberedPersonType
+  relationship    String?
+  
+  dateOfBirth     DateTime?
+  dateOfDeath     DateTime?
+  
+  notes           String?
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@index([alokaPujaId])
+}
+
+// ==================== AUDIT & COMPLIANCE ====================
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action      String    // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity      String    // Donation, Donor, Receipt, etc.
+  entityId    String?
+  
+  changes     Json?     // Before/after values
+  ipAddress   String?
+  userAgent   String?
+  
+  timestamp   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([timestamp])
+}
+
+// ==================== SYSTEM SETTINGS ====================
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String?  // e.g., "email", "receipts", "general"
+  
+  updatedAt   DateTime @updatedAt
+  
+  @@index([key])
+  @@index([category])
+}
