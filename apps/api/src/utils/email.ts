@@ -4,14 +4,24 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
-// Load env from workspace root as well as local .env (with override)
-dotenv.config();
-const rootEnvPath = path.resolve(process.cwd(), '../../.env');
-if (fs.existsSync(rootEnvPath)) {
-  dotenv.config({ path: rootEnvPath, override: true });
-  logger.info('Loaded root .env for SMTP', { rootEnvPath });
+// Load env from the monorepo root to ensure we pick up the real SMTP config
+const rootEnvCandidates = [
+  path.resolve(__dirname, '../../../../.env'), // from src/utils -> repo root
+  path.resolve(process.cwd(), '.env'), // current working directory
+  path.resolve(process.cwd(), '../../.env'), // if cwd is apps/api
+];
+let loadedEnvPath: string | null = null;
+for (const candidate of rootEnvCandidates) {
+  if (fs.existsSync(candidate)) {
+    dotenv.config({ path: candidate, override: true });
+    loadedEnvPath = candidate;
+    break;
+  }
+}
+if (loadedEnvPath) {
+  logger.info('Loaded .env for SMTP', { loadedEnvPath });
 } else {
-  logger.warn('Root .env not found for SMTP load', { rootEnvPath });
+  logger.warn('No .env file found for SMTP configuration', { rootEnvCandidates });
 }
 
 interface EmailOptions {
