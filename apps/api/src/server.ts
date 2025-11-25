@@ -10,6 +10,8 @@ import { prisma } from '@dms/database';
 import path from 'path';
 
 dotenv.config();
+// Also load workspace root .env when running from monorepo root
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const app: Express = express();
 const PORT = process.env.API_PORT || 3000;

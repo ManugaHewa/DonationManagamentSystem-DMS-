@@ -1,5 +1,18 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { logger } from './logger';
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+
+// Load env from workspace root as well as local .env (with override)
+dotenv.config();
+const rootEnvPath = path.resolve(process.cwd(), '../../.env');
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath, override: true });
+  logger.info('Loaded root .env for SMTP', { rootEnvPath });
+} else {
+  logger.warn('Root .env not found for SMTP load', { rootEnvPath });
+}
 
 interface EmailOptions {
   to: string;
@@ -18,31 +31,26 @@ async function getTransporter(): Promise<Transporter> {
   const port = parseInt(process.env.SMTP_PORT || '0', 10);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
+  logger.info('SMTP env', { host, port, user, from: process.env.SMTP_FROM });
 
-  // If host is provided, honor it even without auth (e.g., MailDev/Mailhog/relay)
-  if (host) {
-    cachedTransporter = nodemailer.createTransport({
-      host,
-      port: port || 587,
-      secure: port === 465,
-      auth: user ? { user, pass } : undefined,
-    });
-    return cachedTransporter;
+  if (!host) {
+    throw new Error('SMTP_HOST is not configured; cannot send emails');
   }
 
-  // Fallback: create a test account so emails always "send" in dev with a preview URL
-  const testAccount = await nodemailer.createTestAccount();
+  const isGmail = host.includes('gmail');
   cachedTransporter = nodemailer.createTransport({
-    host: testAccount.smtp.host,
-    port: testAccount.smtp.port,
-    secure: testAccount.smtp.secure,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass,
-    },
+    service: isGmail ? 'gmail' : undefined,
+    host,
+    port: port || (isGmail ? 587 : 587),
+    secure: port === 465,
+    auth: user ? { user, pass } : undefined,
   });
-  usingTestAccount = true;
-  logger.warn('SMTP_HOST not configured. Using Ethereal test account; emails will appear in preview URL only.');
+  try {
+    await cachedTransporter.verify();
+    logger.info('SMTP transporter ready', { host, port, user });
+  } catch (err) {
+    logger.warn('SMTP verify failed', { host, port, user, err });
+  }
   return cachedTransporter;
 }
 
@@ -57,27 +65,12 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
       html: options.html,
     });
     const preview = usingTestAccount ? nodemailer.getTestMessageUrl(info) : null;
-    logger.info(`Email sent to ${options.to}: ${options.subject}${preview ? ` (Preview: ${preview})` : ''}`);
-  } catch (error) {
-    // If primary transport fails, try falling back to a test transport so we at least get a preview URL
-    if (!usingTestAccount) {
-      logger.warn('Primary SMTP send failed, attempting Ethereal fallback...', error);
-      cachedTransporter = null;
-      usingTestAccount = false;
-      const transporter = await getTransporter();
-      const info = await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@temple.org',
-        to: options.to,
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-      });
-      const preview = nodemailer.getTestMessageUrl(info);
-      logger.info(`Email sent via fallback to ${options.to}: ${options.subject} (Preview: ${preview})`);
-      return;
-    }
-
-    logger.error('Email sending failed:', error);
+    logger.info(`Email sent to ${options.to}: ${options.subject}${preview ? ` (Preview: ${preview})` : ''}`, {
+      messageId: info.messageId,
+      response: info.response,
+    });
+  } catch (error: any) {
+    logger.error('Email sending failed:', { error: error?.message, response: error?.response });
     throw error;
   }
 }
