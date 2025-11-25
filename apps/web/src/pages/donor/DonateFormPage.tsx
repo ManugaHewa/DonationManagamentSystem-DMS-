@@ -179,13 +179,17 @@ export default function DonateFormPage() {
         </div>
 
         {/* Net Amount Display */}
-        {(amount || processorFees) && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-blue-900">
-              Net Amount to Temple: ${( (amount || 0) - (processorFees || 0) ).toFixed(2)} CAD
-            </p>
-          </div>
-        )}
+        {(() => {
+          const net = Number(amount ?? 0) - Number(processorFees ?? 0);
+          const hasValue = amount !== undefined || processorFees !== undefined;
+          return hasValue && Number.isFinite(net) ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-900">
+                Net Amount to Temple: ${net.toFixed(2)} CAD
+              </p>
+            </div>
+          ) : null;
+        })()}
 
         {/* Remarks */}
         <div>
