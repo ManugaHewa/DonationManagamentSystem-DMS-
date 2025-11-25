@@ -1,16 +1,17 @@
-﻿import { useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
 import toast from 'react-hot-toast';
 
 interface RegisterForm {
-  email: string;
+  email?: string;
+  phone?: string;
+  username?: string;
   password: string;
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  mobile: string;
   address: string;
   city: string;
   province: string;
@@ -19,7 +20,7 @@ interface RegisterForm {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterForm>();
+  const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>();
   
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterForm) => {
@@ -40,6 +41,12 @@ export default function RegisterPage() {
       toast.error('Passwords do not match');
       return;
     }
+
+    if (!data.email && !data.phone && !data.username) {
+      toast.error('Provide at least one: email, phone, or username');
+      return;
+    }
+
     registerMutation.mutate(data);
   };
 
@@ -75,29 +82,27 @@ export default function RegisterPage() {
             </div>
           </div>
           
-          <div>
-            <label htmlFor="email" className="sr-only">Email address</label>
+          <div className="grid grid-cols-1 gap-3">
             <input
-              {...register('email', { 
-                required: 'Email is required',
-                pattern: { value: /^\S+@\S+$/i, message: 'Invalid email address' }
-              })}
+              {...register('email', { pattern: { value: /^\S+@\S+$/i, message: 'Invalid email address' } })}
               type="email"
               className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
+              placeholder="Email (optional)"
             />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-          </div>
+            {errors.email && <p className="text-red-500 text-xs">{errors.email.message}</p>}
 
-          <div>
-            <label htmlFor="mobile" className="sr-only">Mobile</label>
             <input
-              {...register('mobile', { required: 'Mobile is required' })}
+              {...register('phone')}
               type="tel"
               className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Mobile"
+              placeholder="Phone number (optional)"
             />
-            {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile.message}</p>}
+            <input
+              {...register('username')}
+              type="text"
+              className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+              placeholder="Username (optional)"
+            />
           </div>
 
           <div>

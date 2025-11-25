@@ -19,10 +19,8 @@ async function getTransporter(): Promise<Transporter> {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
 
-  const looksLikeLocalDev = host === 'localhost' && !user && !pass;
-
-  // If host/user/pass are provided and it is not the default localhost placeholder, use them as-is (real SMTP)
-  if (host && !looksLikeLocalDev) {
+  // If host is provided, honor it even without auth (e.g., MailDev/Mailhog/relay)
+  if (host) {
     cachedTransporter = nodemailer.createTransport({
       host,
       port: port || 587,

@@ -29,7 +29,7 @@ export function useLogin() {
   const navigate = useNavigate();
 
   return useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
+    mutationFn: async (credentials: { identifier?: string; email?: string; phone?: string; username?: string; password: string }) => {
       const response = await apiClient.post('/auth/login', credentials);
       return response.data;
     },

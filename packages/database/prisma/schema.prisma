@@ -73,7 +73,9 @@ enum RememberedPersonType {
 
 model User {
   id                String    @id @default(cuid())
-  email             String    @unique
+  email             String?   @unique
+  phone             String?   @unique
+  username          String?   @unique
   password          String
   role              UserRole  @default(DONOR)
   isActive          Boolean   @default(true)
@@ -124,12 +126,12 @@ model PasswordReset {
 
 model Donor {
   id                String    @id @default(cuid())
-  
+
   // Required fields
   firstName         String
   lastName          String
-  email             String    @unique
-  mobile            String
+  email             String?   @unique
+  mobile            String?
   address           String
   city              String
   province          String

@@ -18,16 +18,20 @@ export interface PaginatedResponse<T> {
 
 // Auth types
 export interface LoginRequest {
-  email: string;
+  identifier?: string;
+  email?: string;
+  phone?: string;
+  username?: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  email: string;
+  email?: string;
+  phone?: string;
+  username?: string;
   password: string;
   firstName: string;
   lastName: string;
-  mobile: string;
   address: string;
   city: string;
   province: string;
@@ -49,8 +53,8 @@ export interface DonorProfile {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
-  mobile: string;
+  email?: string;
+  mobile?: string;
   address: string;
   city: string;
   province: string;

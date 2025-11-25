@@ -13,7 +13,15 @@ export const createDonationSchema = z.object({
   otherCause: z.string().optional(),
 });
 
+const booleanish = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    return val === 'true' || val === '1';
+  }
+  if (typeof val === 'boolean') return val;
+  return undefined;
+}, z.boolean());
+
 export const validateDonationSchema = z.object({
-  approved: z.boolean(),
+  approved: booleanish,
   remarks: z.string().optional(),
 });

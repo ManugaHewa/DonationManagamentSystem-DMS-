@@ -6,6 +6,7 @@ import receiptRoutes from './receipt.routes';
 import reportRoutes from './report.routes';
 import alokaPujaRoutes from './aloka-puja.routes';
 import donationCauseRoutes from './donation-cause.routes';
+import paymentRoutes from './payment.routes';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/donation-causes', donationCauseRoutes);
 router.use('/receipts', receiptRoutes);
 router.use('/reports', reportRoutes);
 router.use('/aloka-puja', alokaPujaRoutes);
+router.use('/payments', paymentRoutes);
 
 export default router;

@@ -1,8 +1,9 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { DonationController } from '../controllers/donation.controller';
 import { authenticate, authorize, requireApprovedUser } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createDonationSchema, validateDonationSchema } from '../validators/donation.validator';
+import { receiptUpload } from '../middleware/upload';
 
 const router = Router();
 const donationController = new DonationController();
@@ -24,6 +25,7 @@ router.patch('/:id', (req, res) => donationController.update(req, res));
 router.patch(
   '/:id/validate',
   authorize(['ADMIN', 'ACCOUNTANT']),
+  receiptUpload.single('attachment'),
   validate(validateDonationSchema),
   (req, res) => donationController.validate(req, res)
 );

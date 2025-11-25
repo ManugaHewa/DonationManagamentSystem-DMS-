@@ -11,14 +11,26 @@ import crypto from 'crypto';
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password, firstName, lastName, mobile, address, city, province, postalCode } = req.body;
+      const { email, phone, username, password, firstName, lastName, address, city, province, postalCode } = req.body;
+
+      if (!email && !phone && !username) {
+        return res.status(400).json({ success: false, message: 'Email, phone, or username is required' });
+      }
 
       // Check if user exists
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            email ? { email } : undefined,
+            phone ? { phone } : undefined,
+            username ? { username } : undefined,
+          ].filter(Boolean) as any,
+        },
+      });
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'User already exists with this email',
+          message: 'User already exists with this email/phone/username',
         });
       }
 
@@ -28,7 +40,9 @@ export class AuthController {
       // Create user with donor profile (inactive until admin approval)
       const user = await prisma.user.create({
         data: {
-          email,
+          email: email || null,
+          phone: phone || null,
+          username: username || null,
           password: hashedPassword,
           role: UserRole.DONOR,
           isActive: false,
@@ -36,8 +50,8 @@ export class AuthController {
             create: {
               firstName,
               lastName,
-              email,
-              mobile,
+              email: email || undefined,
+              mobile: phone || null,
               address,
               city,
               province,
@@ -55,11 +69,13 @@ export class AuthController {
       // Send verification email
       const verificationToken = this.generateVerificationToken(user.id);
       const verifyLink = `${process.env.WEB_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
-      await sendEmail({
-        to: email,
-        subject: 'Verify Your Email - DMS',
-        html: `<p>Welcome to the Temple! Please verify your email by clicking this link: <a href="${verifyLink}">${verifyLink}</a></p>`,
-      });
+      if (email) {
+        await sendEmail({
+          to: email,
+          subject: 'Verify Your Email - DMS',
+          html: `<p>Welcome to the Temple! Please verify your email by clicking this link: <a href="${verifyLink}">${verifyLink}</a></p>`,
+        });
+      }
 
       logger.info(`User registered: ${email}`);
 
@@ -86,11 +102,23 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password } = req.body;
+      const { email, phone, username, identifier, password } = req.body;
 
-      // Find user
-      const user = await prisma.user.findUnique({
-        where: { email },
+      const searchValue = identifier || email || phone || username;
+
+      if (!searchValue) {
+        return res.status(400).json({ success: false, message: 'Email, phone, or username is required' });
+      }
+
+      // Find user by any identifier
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: searchValue },
+            { phone: searchValue },
+            { username: searchValue },
+          ],
+        },
         include: { donor: true },
       });
 
@@ -110,8 +138,8 @@ export class AuthController {
         });
       }
 
-      // Require verified email
-      if (user.role === UserRole.DONOR && !user.emailVerified) {
+      // Require verified email only when an email exists
+      if (user.role === UserRole.DONOR && user.email && !user.emailVerified) {
         return res.status(403).json({
           success: false,
           message: 'Please verify your email before logging in.',
@@ -119,12 +147,7 @@ export class AuthController {
       }
 
       // Check if user is active/approved
-      if (user.role === UserRole.DONOR && !user.isActive) {
-        return res.status(403).json({
-          success: false,
-          message: 'Your account is pending admin approval.',
-        });
-      }
+      // Allow login even if pending approval; downstream routes will enforce approval for protected actions
 
       // Generate tokens
       const accessToken = this.generateAccessToken(user);
@@ -352,7 +375,7 @@ export class AuthController {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
 
-      if (!existing.emailVerified) {
+      if (existing.email && !existing.emailVerified) {
         return res.status(400).json({ success: false, message: 'User has not verified their email yet' });
       }
 

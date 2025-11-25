@@ -13,6 +13,7 @@ router.use(authenticate);
 // Donor routes - view own receipts
 router.get('/my-receipts', receiptController.getMyReceipts);
 router.get('/:id/download', receiptController.downloadReceipt);
+router.post('/self/year/:year', receiptController.generateSelfYearEnd);
 
 // Admin/Accountant routes
 router.get('/', authorize(['ADMIN', 'ACCOUNTANT', 'VOLUNTEER']), receiptController.getAll);
@@ -33,6 +34,16 @@ router.post(
   '/year-end/:fiscalYear',
   authorize(['ADMIN', 'ACCOUNTANT']),
   receiptController.generateYearEnd
+);
+router.post(
+  '/year-end/:fiscalYear/unlock',
+  authorize(['ADMIN', 'ACCOUNTANT']),
+  receiptController.unlockYearEnd
+);
+router.post(
+  '/year-end/:fiscalYear/lock',
+  authorize(['ADMIN', 'ACCOUNTANT']),
+  receiptController.lockYearEnd
 );
 
 export default router;

@@ -77,7 +77,7 @@ export const requireApprovedUser = async (req: AuthRequest, res: Response, next:
       return next();
     }
 
-    if (!user.emailVerified) {
+    if (user.email && !user.emailVerified) {
       return res.status(403).json({ success: false, message: 'Email not verified' });
     }
 

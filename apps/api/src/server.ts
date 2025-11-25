@@ -7,6 +7,7 @@ import routes from './routes/index';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { prisma } from '@dms/database';
+import path from 'path';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api', limiter);
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Request logging
 app.use((req, res, next) => {

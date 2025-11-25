@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { prisma, Prisma, DonationStatus } from '@dms/database';
 import { AuthRequest } from '../middleware/auth';
+import path from 'path';
+import { sendEmail } from '../utils/email';
+import { getPreferredContact } from '../utils/contact';
 
 export class DonationController {
   private async resolveCause(causeId: string, otherCause?: string) {
@@ -50,6 +53,27 @@ export class DonationController {
           isAnonymous: !!isAnonymous,
         },
       });
+
+      // Acknowledgment email (uses donorRemarks contact if provided)
+      const contact = getPreferredContact(
+        null,
+        {
+          email: req.body.email,
+          mobile: req.body.mobile,
+          landline: req.body.landline,
+          firstName: req.body.firstName,
+          lastName: req.body.lastName,
+        } as any
+      );
+      if (contact.type === 'email') {
+        await sendEmail({
+          to: contact.value,
+          subject: 'Thank you for your donation',
+          html: `<p>Thank you for your donation of ${currency} ${parseFloat(amount).toFixed(
+            2
+          )} toward ${cause.name}. We have recorded your contribution and it is pending validation.</p>`,
+        });
+      }
 
       res.status(201).json({ success: true, data: donation, message: 'Donation created' });
     } catch (error) {
@@ -141,6 +165,18 @@ export class DonationController {
         },
       });
 
+      const contact = getPreferredContact(user, user?.donor);
+      if (contact.type === 'email') {
+        await sendEmail({
+          to: contact.value,
+          subject: 'Donation received',
+          html: `<p>Hi ${user?.donor?.firstName || 'Donor'},</p>
+                 <p>Thank you for your donation of ${currency} ${parseFloat(amount).toFixed(
+                   2
+                 )} toward ${cause.name}. Your donation is pending validation. We will notify you once validated.</p>`,
+        });
+      }
+
       res.status(201).json({ success: true, data: donation, message: 'Donation created' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Failed to create donation' });
@@ -164,14 +200,22 @@ export class DonationController {
       const { approved, remarks } = req.body;
       const status = approved ? DonationStatus.VALIDATED : DonationStatus.CANCELLED;
 
+      const fileUrl = req.file
+        ? `/uploads/receipts/${path.basename(req.file.path)}`
+        : undefined;
+
+      const mergedRemarks = [remarks, fileUrl ? `Proof: ${fileUrl}` : null]
+        .filter(Boolean)
+        .join('\n');
+
       const donation = await prisma.donation.update({
         where: { id },
-        data: { status, templeRemarks: remarks },
+        data: { status, templeRemarks: mergedRemarks || undefined },
       });
 
       res.json({
         success: true,
-        data: donation,
+        data: { ...donation, proofFileUrl: fileUrl },
         message: `Donation ${approved ? 'validated' : 'rejected'}`,
       });
     } catch (error) {

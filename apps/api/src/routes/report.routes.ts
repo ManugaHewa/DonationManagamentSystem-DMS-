@@ -12,27 +12,29 @@ router.use(authenticate);
 router.use(authorize(['ADMIN', 'ACCOUNTANT']));
 
 // Dashboard statistics
-router.get('/dashboard', reportController.getDashboardStats);
+router.get('/dashboard', (req, res) => reportController.getDashboardStats(req, res));
 
 // Donation reports
-router.get('/donations', reportController.getDonationReport);
-router.post('/donations/generate', validate(generateReportSchema), reportController.generateDonationReport);
+router.get('/donations', (req, res) => reportController.getDonationReport(req, res));
+router.post('/donations/generate', validate(generateReportSchema), (req, res) =>
+  reportController.generateDonationReport(req, res)
+);
 
 // Donor reports
-router.get('/donors', reportController.getDonorReport);
-router.get('/donors/summary', reportController.getDonorSummary);
+router.get('/donors', (req, res) => reportController.getDonorReport(req, res));
+router.get('/donors/summary', (req, res) => reportController.getDonorSummary(req, res));
 
 // Financial reports
-router.get('/financial/summary', reportController.getFinancialSummary);
-router.get('/financial/by-cause', reportController.getFinancialByCause);
-router.get('/financial/by-type', reportController.getFinancialByType);
+router.get('/financial/summary', (req, res) => reportController.getFinancialSummary(req, res));
+router.get('/financial/by-cause', (req, res) => reportController.getFinancialByCause(req, res));
+router.get('/financial/by-type', (req, res) => reportController.getFinancialByType(req, res));
 
 // Tax receipt reports
-router.get('/tax-receipts/:fiscalYear', reportController.getTaxReceiptReport);
+router.get('/tax-receipts/:fiscalYear', (req, res) => reportController.getTaxReceiptReport(req, res));
 
 // Export reports (simple stubs for now)
-router.get('/export/csv', reportController.exportCSV);
-router.get('/export/excel', reportController.exportExcel);
-router.get('/export/pdf', reportController.exportPDF);
+router.get('/export/csv', (req, res) => reportController.exportCSV(req, res));
+router.get('/export/excel', (req, res) => reportController.exportExcel(req, res));
+router.get('/export/pdf', (req, res) => reportController.exportPDF(req, res));
 
 export default router;

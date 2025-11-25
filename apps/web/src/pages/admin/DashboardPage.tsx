@@ -1,5 +1,6 @@
-﻿import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
+import { format } from 'date-fns';
 
 export default function AdminDashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -7,6 +8,14 @@ export default function AdminDashboard() {
     queryFn: async () => {
       const response = await apiClient.get('/reports/dashboard');
       return response.data.data;
+    },
+  });
+
+  const { data: recentDonations } = useQuery({
+    queryKey: ['recent-donations'],
+    queryFn: async () => {
+      const response = await apiClient.get('/reports/donations');
+      return (response.data.data || []).slice(0, 5);
     },
   });
 
@@ -77,8 +86,28 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-8 bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-        <p className="text-sm text-gray-500">Activity feed coming soon...</p>
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Donations</h2>
+        {recentDonations?.length ? (
+          <ul className="divide-y divide-gray-200">
+            {recentDonations.map((donation: any) => (
+              <li key={donation.id} className="py-3 flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {donation.donor}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {donation.cause} • {donation.type} • {format(new Date(donation.dateRecorded), 'MMM dd, yyyy')}
+                  </p>
+                </div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {donation.currency} {Number(donation.amount).toFixed(2)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">No recent donations</p>
+        )}
       </div>
     </div>
   );

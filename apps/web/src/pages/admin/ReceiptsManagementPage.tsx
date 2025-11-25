@@ -1,13 +1,45 @@
-﻿import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function ReceiptsManagementPage() {
+  const queryClient = useQueryClient();
+  const year = new Date().getFullYear();
+
   const { data: receipts, isLoading } = useQuery({
     queryKey: ['receipts'],
     queryFn: async () => {
       const response = await apiClient.get('/receipts');
       return response.data.data || [];
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post(`/receipts/year-end/${year}/unlock`);
+      return response.data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message || 'Tax receipts generated');
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to generate receipts');
+    },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post(`/receipts/year-end/${year}/lock`);
+      return response.data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message || 'Tax receipts locked');
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to lock receipts');
     },
   });
 
@@ -19,9 +51,22 @@ export default function ReceiptsManagementPage() {
     <div>
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Tax Receipts</h1>
-        <button className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-          Generate Year-End Receipts
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => generateMutation.mutate()}
+            disabled={generateMutation.isPending}
+            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {generateMutation.isPending ? 'Unlocking...' : 'Unlock Tax Receipts'}
+          </button>
+          <button
+            onClick={() => lockMutation.mutate()}
+            disabled={lockMutation.isPending}
+            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+          >
+            {lockMutation.isPending ? 'Locking...' : 'Lock Tax Receipts'}
+          </button>
+        </div>
       </div>
       
       <div className="bg-white shadow overflow-hidden sm:rounded-md">

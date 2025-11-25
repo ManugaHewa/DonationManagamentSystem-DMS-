@@ -1,6 +1,8 @@
-﻿import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function DonorDashboard() {
   const { data: stats } = useQuery({
@@ -12,12 +14,26 @@ export default function DonorDashboard() {
       return {
         totalDonations: donations.length,
         totalAmount: total,
-        thisYear: donations.filter((d: any) => 
+        thisYear: donations.filter((d: any) =>
           new Date(d.dateRecorded).getFullYear() === new Date().getFullYear()
         ).length,
       };
     },
   });
+
+  const { data: myReceipts } = useQuery({
+    queryKey: ['my-receipts'],
+    queryFn: async () => {
+      const response = await apiClient.get('/receipts/my-receipts');
+      return response.data.data || [];
+    },
+  });
+
+  useEffect(() => {
+    if (myReceipts && myReceipts.length > 0) {
+      toast.success('Tax receipts are available to download in My Donations.');
+    }
+  }, [myReceipts]);
 
   return (
     <div>
